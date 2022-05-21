@@ -37,20 +37,6 @@ namespace TaskbarBeGone {
 				modifiers |= 0x0001;
 			}
 
-			foreach (var task in BackgroundTaskRegistration.AllTasks) {
-				if (task.Value.Name == backgroundTask) {
-					taskRegistered = true;
-					BackgroundTaskBuilder builder = new BackgroundTaskBuilder();
-
-					builder.Name = backgroundTask;
-					builder.TaskEntryPoint = "TaskbarBeGone_Background_Task.Task";
-					builder.SetTrigger(new SystemTrigger(SystemTriggerType.SessionConnected, false));
-
-					bTask = builder.Register();
-					break;
-				}
-			}
-
 			// Pass on hotkey to DLL to be registered with windows
 			if (Key.Text != "") { RegisterHotkey(0, 0, modifiers, Key.Text.ToCharArray()[0]); }
 		}

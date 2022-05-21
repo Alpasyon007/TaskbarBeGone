@@ -34,15 +34,6 @@ namespace TaskbarBeGone {
 			m_window.Activate();
 
 			RegisterInstance(hwnd);
-
-			//// Initialize Tray Icon
-			//trayIcon = new NotifyIcon() {
-			//	Icon = Resources.AppIcon,
-			//	ContextMenu = new ContextMenu(new MenuItem[] {
-			//	new MenuItem("Exit", Exit)
-			//}),
-			//	Visible = true
-			//};
 		}
 
 		private void SetWindowSize(int width, int height) {
