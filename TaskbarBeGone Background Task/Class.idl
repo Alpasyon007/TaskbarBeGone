@@ -1,9 +1,0 @@
-namespace TaskbarBeGone_Background_Task
-{
-    [default_interface]
-    runtimeclass Class
-    {
-        Class();
-        Int32 MyProperty;
-    }
-}
