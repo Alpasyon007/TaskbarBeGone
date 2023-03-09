@@ -46,6 +46,8 @@ public:
 
 	void Run();
 private:
+	void				  MainWindow();
+
 	bool				  CreateDeviceD3D(HWND hWnd);
 	void				  CleanupDeviceD3D();
 	static void			  CreateRenderTarget();
@@ -73,12 +75,15 @@ private:
 	inline static ID3D12Resource*			  g_mainRenderTargetResource[NUM_BACK_BUFFERS]	 = {};
 	inline static D3D12_CPU_DESCRIPTOR_HANDLE g_mainRenderTargetDescriptor[NUM_BACK_BUFFERS] = {};
 
+	const wchar_t							  windowTitle[14]								 = L"TaskbarBeGone";
+
 	HWND									  hwnd;
 	WNDCLASSEXW								  wc;
 	ImGuiIO*								  io;
 
 	bool									  done				  = false;
 
+	inline static bool						  minimizeToTray	  = true;
 	bool									  show_demo_window	  = true;
 	bool									  show_another_window = false;
 	const ImVec4							  clear_color		  = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);

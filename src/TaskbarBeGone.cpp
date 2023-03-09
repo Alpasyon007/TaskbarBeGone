@@ -3,9 +3,9 @@
 TaskbarBeGone::TaskbarBeGone() : taskbar(FindWindow("Shell_TrayWnd", nullptr)) {
 	// Create application window
 	// ImGui_ImplWin32_EnableDpiAwareness();
-	wc = {sizeof(wc), CS_CLASSDC, TaskbarBeGone::WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, L"ImGui Example", NULL};
+	wc = {sizeof(wc), CS_CLASSDC, TaskbarBeGone::WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, windowTitle, NULL};
 	::RegisterClassExW(&wc);
-	hwnd = ::CreateWindowW(wc.lpszClassName, L"Dear ImGui DirectX12 Example", WS_OVERLAPPEDWINDOW, 100, 100, 520, 520, NULL, NULL, wc.hInstance, NULL);
+	hwnd = ::CreateWindowW(wc.lpszClassName, windowTitle, WS_OVERLAPPEDWINDOW, 100, 100, 520, 520, NULL, NULL, wc.hInstance, NULL);
 
 	// Initialize Direct3D
 	if(!CreateDeviceD3D(hwnd)) {
@@ -24,15 +24,11 @@ TaskbarBeGone::TaskbarBeGone() : taskbar(FindWindow("Shell_TrayWnd", nullptr)) {
 	io = &ImGui::GetIO();
 	(void)io;
 	io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
-	// io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-	io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;	 // Enable Docking
-	io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // Enable Multi-Viewport / Platform Windows
-	// io.ConfigViewportsNoAutoMerge = true;
-	// io.ConfigViewportsNoTaskBarIcon = true;
+	io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;	   // Enable Docking
+	io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;   // Enable Multi-Viewport / Platform Windows
 
 	// Setup Dear ImGui style
 	ImGui::StyleColorsDark();
-	// ImGui::StyleColorsLight();
 
 	// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
 	ImGuiStyle& style = ImGui::GetStyle();
@@ -40,6 +36,8 @@ TaskbarBeGone::TaskbarBeGone() : taskbar(FindWindow("Shell_TrayWnd", nullptr)) {
 		style.WindowRounding			  = 0.0f;
 		style.Colors[ImGuiCol_WindowBg].w = 1.0f;
 	}
+
+	io->Fonts->AddFontFromFileTTF("..\\..\\Assets\\Montserrat-Black.ttf", 14);
 
 	// Setup Platform/Renderer backends
 	ImGui_ImplWin32_Init(hwnd);
@@ -58,6 +56,53 @@ TaskbarBeGone::~TaskbarBeGone() {
 	CleanupDeviceD3D();
 	::DestroyWindow(hwnd);
 	::UnregisterClassW(wc.lpszClassName, wc.hInstance);
+}
+
+void TaskbarBeGone::MainWindow() {
+	ImGuiID dockspace = ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_NoTabBar);
+
+	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+	// if(show_demo_window) ImGui::ShowDemoWindow(&show_demo_window);
+
+	{
+		ImGui::Begin("Hello", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_MenuBar);
+		// Begin the menu bar
+		if(ImGui::BeginMenuBar()) {
+			// Add a "File" menu
+			if(ImGui::BeginMenu("Settings")) {
+				ImGui::MenuItem("Minimize to Tray", NULL, &minimizeToTray);
+				if(ImGui::MenuItem("Refresh application list")) {
+					runningApplications.clear();
+					EnumWindows(TaskbarBeGone::EnumWindowsProc, reinterpret_cast<LPARAM>(&runningApplications));
+				}
+				ImGui::EndMenu();
+			}
+			// End the menu bar
+			ImGui::EndMenuBar();
+		}
+
+		// Get the HWND of the currently focused window
+		HWND foregroundWindow = GetForegroundWindow();
+
+		for(auto& app : runningApplications) {
+			// Check if the application's HWND matches the focused HWND
+			app.focused = (app.id == foregroundWindow);
+
+			ImGui::Selectable(app.title.c_str(), &app.selected);
+
+			// Draw a different color for the focused application
+			if(app.focused) {
+				ImGui::SameLine();
+				ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "[focused]");
+
+				ShowWindow(taskbar, (app.selected) ? SW_HIDE : SW_SHOW);
+			}
+		}
+
+		ImGui::End();
+	}
+
+	ImGui::DockBuilderDockWindow("Hello", dockspace);
 }
 
 void TaskbarBeGone::Run() {
@@ -81,63 +126,8 @@ void TaskbarBeGone::Run() {
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-		// IMGUI CODE
-		ImGuiID dockspace = ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_NoTabBar);
-
-		// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-		// if(show_demo_window) ImGui::ShowDemoWindow(&show_demo_window);
-
-		{
-			ImGui::Begin("Hello", NULL, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_MenuBar);
-			// Begin the menu bar
-			if(ImGui::BeginMenuBar()) {
-				// Add a "File" menu
-				if(ImGui::BeginMenu("File")) {
-					if(ImGui::MenuItem("Open", "Ctrl+O")) { /* Do something */
-					}
-					if(ImGui::MenuItem("Save", "Ctrl+S")) { /* Do something */
-					}
-					if(ImGui::MenuItem("Quit", "Alt+F4")) {}
-					ImGui::EndMenu();
-				}
-
-				// Add an "Edit" menu
-				if(ImGui::BeginMenu("Edit")) {
-					if(ImGui::MenuItem("Undo", "Ctrl+Z")) { /* Do something */
-					}
-					if(ImGui::MenuItem("Redo", "Ctrl+Y")) { /* Do something */
-					}
-					ImGui::EndMenu();
-				}
-
-				// End the menu bar
-				ImGui::EndMenuBar();
-			}
-
-			// Get the HWND of the currently focused window
-			HWND foregroundWindow = GetForegroundWindow();
-
-			for(auto& app : runningApplications) {
-				// Check if the application's HWND matches the focused HWND
-				app.focused = (app.id == foregroundWindow);
-
-				ImGui::Selectable(app.title.c_str(), &app.selected);
-
-				// Draw a different color for the focused application
-				if(app.focused) {
-					ImGui::SameLine();
-					ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), "[focused]");
-
-					ShowWindow(taskbar, (app.selected) ? SW_HIDE : SW_SHOW);
-				}
-			}
-
-			ImGui::End();
-		}
-
-		ImGui::DockBuilderDockWindow("Hello", dockspace);
-
-		// IMGUI CODE
+		// TaskbarBeGone
+		MainWindow();
 
 		// Rendering
 		ImGui::Render();
@@ -176,7 +166,6 @@ void TaskbarBeGone::Run() {
 		}
 
 		g_pSwapChain->Present(1, 0); // Present with vsync
-		// g_pSwapChain->Present(0, 0); // Present without vsync
 
 		UINT64 fenceValue = g_fenceLastSignaledValue + 1;
 		g_pd3dCommandQueue->Signal(g_fence, fenceValue);
@@ -435,7 +424,7 @@ LRESULT WINAPI TaskbarBeGone::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 			}
 			return 0;
 		case WM_SYSCOMMAND:
-			if(wParam == SC_MINIMIZE) {
+			if(wParam == SC_MINIMIZE && minimizeToTray) {
 				// Hide the window instead of minimizing it
 				ShowWindow(hWnd, SW_HIDE);
 
@@ -446,7 +435,7 @@ LRESULT WINAPI TaskbarBeGone::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 				nid.uFlags			 = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP | NIF_GUID;
 				nid.uCallbackMessage = WM_USER + 1;
 				nid.hIcon			 = LoadIcon(NULL, IDI_APPLICATION);
-				strcpy(nid.szTip, "My Application");
+				strcpy_s(nid.szTip, "TaskbarBeGone");
 				Shell_NotifyIcon(NIM_ADD, &nid);
 				return 0;
 			}
