@@ -1,105 +1,17 @@
-// Dear ImGui: standalone example application for DirectX 12
-// If you are new to Dear ImGui, read documentation from the docs/ folder + read the top of imgui.cpp.
-// Read online: https://github.com/ocornut/imgui/tree/master/docs
+#include "TaskbarBeGone.h"
 
-// Important: to compile on 32-bit systems, the DirectX12 backend requires code to be compiled with '#define ImTextureID ImU64'.
-// This is because we need ImTextureID to carry a 64-bit value and by default ImTextureID is defined as void*.
-// This define is set in the example .vcxproj file and need to be replicated in your app or by adding it to your imconfig.h file.
-
-#include "imgui.h"
-#include "imgui_impl_dx12.h"
-#include "imgui_impl_win32.h"
-#include "imgui_internal.h"
-
-#include <d3d12.h>
-#include <dxgi1_4.h>
-#include <tchar.h>
-
-#include <string>
-#include <vector>
-
-#ifdef _DEBUG
-	#define DX12_ENABLE_DEBUG_LAYER
-#endif
-
-#ifdef DX12_ENABLE_DEBUG_LAYER
-	#include <dxgidebug.h>
-	#pragma comment(lib, "dxguid.lib")
-#endif
-
-struct FrameContext {
-	ID3D12CommandAllocator* CommandAllocator;
-	UINT64					FenceValue;
-};
-
-// Data
-static int const				   NUM_FRAMES_IN_FLIGHT							  = 3;
-static FrameContext				   g_frameContext[NUM_FRAMES_IN_FLIGHT]			  = {};
-static UINT						   g_frameIndex									  = 0;
-
-static int const				   NUM_BACK_BUFFERS								  = 3;
-static ID3D12Device*			   g_pd3dDevice									  = NULL;
-static ID3D12DescriptorHeap*	   g_pd3dRtvDescHeap							  = NULL;
-static ID3D12DescriptorHeap*	   g_pd3dSrvDescHeap							  = NULL;
-static ID3D12CommandQueue*		   g_pd3dCommandQueue							  = NULL;
-static ID3D12GraphicsCommandList*  g_pd3dCommandList							  = NULL;
-static ID3D12Fence*				   g_fence										  = NULL;
-static HANDLE					   g_fenceEvent									  = NULL;
-static UINT64					   g_fenceLastSignaledValue						  = 0;
-static IDXGISwapChain3*			   g_pSwapChain									  = NULL;
-static HANDLE					   g_hSwapChainWaitableObject					  = NULL;
-static ID3D12Resource*			   g_mainRenderTargetResource[NUM_BACK_BUFFERS]	  = {};
-static D3D12_CPU_DESCRIPTOR_HANDLE g_mainRenderTargetDescriptor[NUM_BACK_BUFFERS] = {};
-
-// Forward declarations of helper functions
-bool							   CreateDeviceD3D(HWND hWnd);
-void							   CleanupDeviceD3D();
-void							   CreateRenderTarget();
-void							   CleanupRenderTarget();
-void							   WaitForLastSubmittedFrame();
-FrameContext*					   WaitForNextFrameResources();
-LRESULT WINAPI					   WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
-struct SelectedApps {
-	std::string title;
-	HWND		id;
-	bool		selected;
-	bool		focused;
-};
-
-// Callback function to receive information about each window
-BOOL CALLBACK EnumWindowsProc(HWND hwnd, LPARAM lParam) {
-	// Get the process ID for the window
-	DWORD processId;
-	GetWindowThreadProcessId(hwnd, &processId);
-
-	// Get the window title
-	char title[256];
-	GetWindowTextA(hwnd, title, sizeof(title));
-
-	// If the window is visible and has a title, add it to the list
-	if(IsWindowVisible(hwnd) && strlen(title) > 0) {
-		auto&		 apps = *reinterpret_cast<std::vector<SelectedApps>*>(lParam);
-		SelectedApps app  = {title, hwnd, false};
-		apps.push_back(app);
-	}
-
-	return TRUE;
-}
-
-// Main code
-int main(int, char**) {
+TaskbarBeGone::TaskbarBeGone() : taskbar(FindWindow("Shell_TrayWnd", nullptr)) {
 	// Create application window
 	// ImGui_ImplWin32_EnableDpiAwareness();
-	WNDCLASSEXW wc = {sizeof(wc), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, L"ImGui Example", NULL};
+	wc = {sizeof(wc), CS_CLASSDC, TaskbarBeGone::WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, L"ImGui Example", NULL};
 	::RegisterClassExW(&wc);
-	HWND hwnd = ::CreateWindowW(wc.lpszClassName, L"Dear ImGui DirectX12 Example", WS_OVERLAPPEDWINDOW, 100, 100, 520, 520, NULL, NULL, wc.hInstance, NULL);
+	hwnd = ::CreateWindowW(wc.lpszClassName, L"Dear ImGui DirectX12 Example", WS_OVERLAPPEDWINDOW, 100, 100, 520, 520, NULL, NULL, wc.hInstance, NULL);
 
 	// Initialize Direct3D
 	if(!CreateDeviceD3D(hwnd)) {
 		CleanupDeviceD3D();
 		::UnregisterClassW(wc.lpszClassName, wc.hInstance);
-		return 1;
+		return;
 	}
 
 	// Show the window
@@ -109,12 +21,12 @@ int main(int, char**) {
 	// Setup Dear ImGui context
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
-	ImGuiIO& io = ImGui::GetIO();
+	io = &ImGui::GetIO();
 	(void)io;
-	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
+	io->ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
 	// io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;	// Enable Docking
-	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // Enable Multi-Viewport / Platform Windows
+	io->ConfigFlags |= ImGuiConfigFlags_DockingEnable;	 // Enable Docking
+	io->ConfigFlags |= ImGuiConfigFlags_ViewportsEnable; // Enable Multi-Viewport / Platform Windows
 	// io.ConfigViewportsNoAutoMerge = true;
 	// io.ConfigViewportsNoTaskBarIcon = true;
 
@@ -124,7 +36,7 @@ int main(int, char**) {
 
 	// When viewports are enabled we tweak WindowRounding/WindowBg so platform windows can look identical to regular ones.
 	ImGuiStyle& style = ImGui::GetStyle();
-	if(io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+	if(io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
 		style.WindowRounding			  = 0.0f;
 		style.Colors[ImGuiCol_WindowBg].w = 1.0f;
 	}
@@ -133,40 +45,26 @@ int main(int, char**) {
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX12_Init(g_pd3dDevice, NUM_FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeap,
 						g_pd3dSrvDescHeap->GetCPUDescriptorHandleForHeapStart(), g_pd3dSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
+}
 
-	// Load Fonts
-	// - If no fonts are loaded, dear imgui will use the default font. You can also load multiple fonts and use ImGui::PushFont()/PopFont() to select them.
-	// - AddFontFromFileTTF() will return the ImFont* so you can store it if you need to select the font among multiple.
-	// - If the file cannot be loaded, the function will return NULL. Please handle those errors in your application (e.g. use an assertion, or display an error
-	// and quit).
-	// - The fonts will be rasterized at a given size (w/ oversampling) and stored into a texture when calling ImFontAtlas::Build()/GetTexDataAsXXXX(), which
-	// ImGui_ImplXXXX_NewFrame below will call.
-	// - Use '#define IMGUI_ENABLE_FREETYPE' in your imconfig file to use Freetype for higher quality font rendering.
-	// - Read 'docs/FONTS.md' for more instructions and details.
-	// - Remember that in C/C++ if you want to include a backslash \ in a string literal you need to write a double backslash \\ !
-	// io.Fonts->AddFontDefault();
-	// io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\segoeui.ttf", 18.0f);
-	// io.Fonts->AddFontFromFileTTF("../../misc/fonts/DroidSans.ttf", 16.0f);
-	// io.Fonts->AddFontFromFileTTF("../../misc/fonts/Roboto-Medium.ttf", 16.0f);
-	// io.Fonts->AddFontFromFileTTF("../../misc/fonts/Cousine-Regular.ttf", 15.0f);
-	// ImFont* font = io.Fonts->AddFontFromFileTTF("c:\\Windows\\Fonts\\ArialUni.ttf", 18.0f, NULL, io.Fonts->GetGlyphRangesJapanese());
-	// IM_ASSERT(font != NULL);
+TaskbarBeGone::~TaskbarBeGone() {
+	WaitForLastSubmittedFrame();
 
-	// Our state
-	bool					  show_demo_window	  = true;
-	bool					  show_another_window = false;
-	ImVec4					  clear_color		  = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+	// Cleanup
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
 
-	HWND					  taskbar			  = ::FindWindow("Shell_TrayWnd", nullptr);
+	CleanupDeviceD3D();
+	::DestroyWindow(hwnd);
+	::UnregisterClassW(wc.lpszClassName, wc.hInstance);
+}
 
-	std::vector<SelectedApps> runningApplications;
-
-	// Enumerate all top-level windows
+void TaskbarBeGone::Run() {
 	runningApplications.clear();
-	EnumWindows(EnumWindowsProc, reinterpret_cast<LPARAM>(&runningApplications));
+	EnumWindows(TaskbarBeGone::EnumWindowsProc, reinterpret_cast<LPARAM>(&runningApplications));
 
 	// Main loop
-	bool done = false;
 	while(!done) {
 		// Poll and handle messages (inputs, window resize, etc.)
 		// See the WndProc() function below for our to dispatch events to the Win32 backend.
@@ -272,7 +170,7 @@ int main(int, char**) {
 		g_pd3dCommandQueue->ExecuteCommandLists(1, (ID3D12CommandList* const*)&g_pd3dCommandList);
 
 		// Update and Render additional Platform Windows
-		if(io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
+		if(io->ConfigFlags & ImGuiConfigFlags_ViewportsEnable) {
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault(NULL, (void*)g_pd3dCommandList);
 		}
@@ -285,23 +183,10 @@ int main(int, char**) {
 		g_fenceLastSignaledValue = fenceValue;
 		frameCtx->FenceValue	 = fenceValue;
 	}
-
-	WaitForLastSubmittedFrame();
-
-	// Cleanup
-	ImGui_ImplDX12_Shutdown();
-	ImGui_ImplWin32_Shutdown();
-	ImGui::DestroyContext();
-
-	CleanupDeviceD3D();
-	::DestroyWindow(hwnd);
-	::UnregisterClassW(wc.lpszClassName, wc.hInstance);
-
-	return 0;
 }
 
 // Helper functions
-bool CreateDeviceD3D(HWND hWnd) {
+bool TaskbarBeGone::CreateDeviceD3D(HWND hWnd) {
 	// Setup swap chain
 	DXGI_SWAP_CHAIN_DESC1 sd;
 	{
@@ -403,7 +288,7 @@ bool CreateDeviceD3D(HWND hWnd) {
 	return true;
 }
 
-void CleanupDeviceD3D() {
+void TaskbarBeGone::CleanupDeviceD3D() {
 	CleanupRenderTarget();
 	if(g_pSwapChain) {
 		g_pSwapChain->SetFullscreenState(false, NULL);
@@ -454,7 +339,7 @@ void CleanupDeviceD3D() {
 #endif
 }
 
-void CreateRenderTarget() {
+void TaskbarBeGone::CreateRenderTarget() {
 	for(UINT i = 0; i < NUM_BACK_BUFFERS; i++) {
 		ID3D12Resource* pBackBuffer = NULL;
 		g_pSwapChain->GetBuffer(i, IID_PPV_ARGS(&pBackBuffer));
@@ -463,7 +348,7 @@ void CreateRenderTarget() {
 	}
 }
 
-void CleanupRenderTarget() {
+void TaskbarBeGone::CleanupRenderTarget() {
 	WaitForLastSubmittedFrame();
 
 	for(UINT i = 0; i < NUM_BACK_BUFFERS; i++)
@@ -473,7 +358,7 @@ void CleanupRenderTarget() {
 		}
 }
 
-void WaitForLastSubmittedFrame() {
+void TaskbarBeGone::WaitForLastSubmittedFrame() {
 	FrameContext* frameCtx	 = &g_frameContext[g_frameIndex % NUM_FRAMES_IN_FLIGHT];
 
 	UINT64		  fenceValue = frameCtx->FenceValue;
@@ -486,7 +371,7 @@ void WaitForLastSubmittedFrame() {
 	WaitForSingleObject(g_fenceEvent, INFINITE);
 }
 
-FrameContext* WaitForNextFrameResources() {
+FrameContext* TaskbarBeGone::WaitForNextFrameResources() {
 	UINT nextFrameIndex				 = g_frameIndex + 1;
 	g_frameIndex					 = nextFrameIndex;
 
@@ -508,58 +393,75 @@ FrameContext* WaitForNextFrameResources() {
 	return frameCtx;
 }
 
-// Forward declare message handler from imgui_impl_win32.cpp
-extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+// Callback function to receive information about each window
+BOOL CALLBACK TaskbarBeGone::EnumWindowsProc(HWND hwnd, LPARAM lParam) {
+	// Get the process ID for the window
+	DWORD processId;
+	GetWindowThreadProcessId(hwnd, &processId);
+
+	// Get the window title
+	char title[256];
+	GetWindowTextA(hwnd, title, sizeof(title));
+
+	// If the window is visible and has a title, add it to the list
+	if(IsWindowVisible(hwnd) && strlen(title) > 0) {
+		auto&		 apps = *reinterpret_cast<std::vector<SelectedApps>*>(lParam);
+		SelectedApps app  = {title, hwnd, false};
+		apps.push_back(app);
+	}
+
+	return TRUE;
+}
 
 // Win32 message handler
 // You can read the io.WantCaptureMouse, io.WantCaptureKeyboard flags to tell if dear imgui wants to use your inputs.
 // - When io.WantCaptureMouse is true, do not dispatch mouse input data to your main application, or clear/overwrite your copy of the mouse data.
 // - When io.WantCaptureKeyboard is true, do not dispatch keyboard input data to your main application, or clear/overwrite your copy of the keyboard data.
 // Generally you may always pass all inputs to dear imgui, and hide them from your application based on those two flags.
-LRESULT WINAPI				  WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-	   if(ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam)) return true;
+LRESULT WINAPI TaskbarBeGone::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+	if(ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam)) return true;
 
-	   static NOTIFYICONDATA nid = {sizeof(nid)};
+	static NOTIFYICONDATA nid = {sizeof(nid)};
 
-	   switch(msg) {
-		   case WM_SIZE:
-			   if(g_pd3dDevice != NULL && wParam != SIZE_MINIMIZED) {
-				   WaitForLastSubmittedFrame();
-				   CleanupRenderTarget();
-				   HRESULT result = g_pSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN,
-																			DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
-				   assert(SUCCEEDED(result) && "Failed to resize swapchain.");
-				   CreateRenderTarget();
-			   }
-			   return 0;
-		   case WM_SYSCOMMAND:
-			   if(wParam == SC_MINIMIZE) {
-				   // Hide the window instead of minimizing it
-				   ShowWindow(hWnd, SW_HIDE);
+	switch(msg) {
+		case WM_SIZE:
+			if(g_pd3dDevice != NULL && wParam != SIZE_MINIMIZED) {
+				WaitForLastSubmittedFrame();
+				CleanupRenderTarget();
+				HRESULT result = g_pSwapChain->ResizeBuffers(0, (UINT)LOWORD(lParam), (UINT)HIWORD(lParam), DXGI_FORMAT_UNKNOWN,
+															 DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT);
+				assert(SUCCEEDED(result) && "Failed to resize swapchain.");
+				CreateRenderTarget();
+			}
+			return 0;
+		case WM_SYSCOMMAND:
+			if(wParam == SC_MINIMIZE) {
+				// Hide the window instead of minimizing it
+				ShowWindow(hWnd, SW_HIDE);
 
-				   memset(&nid, 0, sizeof(nid));
-				   nid.cbSize			= sizeof(nid);
-				   nid.hWnd				= hWnd;
-				   nid.uID				= 1;
-				   nid.uFlags			= NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP | NIF_GUID;
-				   nid.uCallbackMessage = WM_USER + 1;
-				   nid.hIcon			= LoadIcon(NULL, IDI_APPLICATION);
-				   strcpy(nid.szTip, "My Application");
-				   Shell_NotifyIcon(NIM_ADD, &nid);
-				   return 0;
-			   }
-			   if((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
-				   return 0;
-			   break;
-		   case WM_DESTROY: ::PostQuitMessage(0); return 0;
-		   case WM_USER + 1: {
-			   // Restore the window when the system tray icon is clicked
-			   if(lParam == WM_LBUTTONUP) {
-				   Shell_NotifyIcon(NIM_DELETE, &nid);
-				   ShowWindow(hWnd, SW_SHOW);
-				   SetForegroundWindow(hWnd);
-			   }
-		   } break;
-	   }
-	   return ::DefWindowProcW(hWnd, msg, wParam, lParam);
+				memset(&nid, 0, sizeof(nid));
+				nid.cbSize			 = sizeof(nid);
+				nid.hWnd			 = hWnd;
+				nid.uID				 = 1;
+				nid.uFlags			 = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP | NIF_GUID;
+				nid.uCallbackMessage = WM_USER + 1;
+				nid.hIcon			 = LoadIcon(NULL, IDI_APPLICATION);
+				strcpy(nid.szTip, "My Application");
+				Shell_NotifyIcon(NIM_ADD, &nid);
+				return 0;
+			}
+			if((wParam & 0xfff0) == SC_KEYMENU) // Disable ALT application menu
+				return 0;
+			break;
+		case WM_DESTROY: ::PostQuitMessage(0); return 0;
+		case WM_TRAYICON: {
+			// Restore the window when the system tray icon is clicked
+			if(lParam == WM_LBUTTONUP) {
+				Shell_NotifyIcon(NIM_DELETE, &nid);
+				ShowWindow(hWnd, SW_SHOW);
+				SetForegroundWindow(hWnd);
+			}
+		} break;
+	}
+	return ::DefWindowProcW(hWnd, msg, wParam, lParam);
 }
