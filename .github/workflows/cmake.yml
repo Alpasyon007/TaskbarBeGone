@@ -28,7 +28,9 @@ jobs:
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
 
     - name: Bootstarp Boost
-      run: ${{github.workspace}}/ThirdParty/boost/bootstrap.bat
+      run: |
+        cd ThirdParty/boost
+        bootstrap.bat
 
     - name: Build Boost
       run: ${{github.workspace}}/ThirdParty/boost/b2.exe
