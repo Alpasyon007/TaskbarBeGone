@@ -21,19 +21,18 @@ jobs:
     - uses: actions/checkout@v3
       with:
             submodules: 'recursive'
+    
+    - name: Build Boost
+      shell: powershell
+      run: |
+        cd ThirdParty/boost
+        .\bootstrap.bat
+        .\b2 headers
 
     - name: Configure CMake
       # Configure CMake in a 'build' subdirectory. `CMAKE_BUILD_TYPE` is only required if you are using a single-configuration generator such as make.
       # See https://cmake.org/cmake/help/latest/variable/CMAKE_BUILD_TYPE.html?highlight=cmake_build_type
       run: cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-
-    - name: Bootstarp Boost
-      run: |
-        cd ThirdParty/boost
-        bootstrap.bat
-
-    - name: Build Boost
-      run: ${{github.workspace}}/ThirdParty/boost/b2.exe
 
     - name: Build TaskbarBeGone
       # Build your program with the given configuration
