@@ -10,8 +10,12 @@
 #include <dxgi1_4.h>
 #include <tchar.h>
 
+#include <algorithm>
 #include <string>
 #include <vector>
+
+#include <boost/archive/text_iarchive.hpp>
+#include <boost/archive/text_oarchive.hpp>
 
 #ifdef _DEBUG
 	#define DX12_ENABLE_DEBUG_LAYER
@@ -32,9 +36,19 @@ struct FrameContext {
 	UINT64					FenceValue;
 };
 
-struct SelectedApps {
+class SelectedApps {
+private:
+	friend class boost::serialization::access;
+
+	template <class Archive> void serialize(Archive& ar, const unsigned int version) {
+		ar& title;
+		ar& id;
+		ar& selected;
+		ar& focused;
+	}
+public:
 	std::string title;
-	HWND		id;
+	int			id;
 	bool		selected;
 	bool		focused;
 };
@@ -47,6 +61,9 @@ public:
 	void Run();
 private:
 	void				  MainWindow();
+
+	void				  addToStartup();
+	void				  removeFromStartup();
 
 	bool				  CreateDeviceD3D(HWND hWnd);
 	void				  CleanupDeviceD3D();
@@ -82,6 +99,7 @@ private:
 	ImGuiIO*								  io;
 
 	bool									  done				  = false;
+	bool									  runOnStartup		  = false;
 
 	inline static bool						  minimizeToTray	  = true;
 	bool									  show_demo_window	  = true;

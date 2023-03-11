@@ -7,6 +7,8 @@ cmake_minimum_required(VERSION 3.12)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+set(APP_ICON_RESOURCE_WINDOWS ${CMAKE_CURRENT_SOURCE_DIR}/Assets/icon.rc)
+
 # Set the project name
 project(TaskbarBeGone)
 
@@ -33,6 +35,8 @@ add_executable(
 	# ImGui DirectX 12 Backends
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui/backends/imgui_impl_win32.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui/backends/imgui_impl_dx12.cpp
+
+	${APP_ICON_RESOURCE_WINDOWS}
 )
 
 target_include_directories(
@@ -41,6 +45,7 @@ target_include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/stb/
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui/backends
+	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/boost
 )
 
 target_link_libraries(
@@ -49,4 +54,5 @@ target_link_libraries(
 	stb_image
 	d3d12
 	dxgi
+	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/boost/stage/lib/libboost_serialization-vc143-mt-gd-x64-1_82.lib
 )

@@ -1,5 +1,9 @@
 #include "TaskbarBeGone.h"
 
+#include <fstream>
+#include <iostream>
+#include <set>
+
 TaskbarBeGone::TaskbarBeGone() : taskbar(FindWindow("Shell_TrayWnd", nullptr)) {
 	// Create application window
 	// ImGui_ImplWin32_EnableDpiAwareness();
@@ -43,9 +47,50 @@ TaskbarBeGone::TaskbarBeGone() : taskbar(FindWindow("Shell_TrayWnd", nullptr)) {
 	ImGui_ImplWin32_Init(hwnd);
 	ImGui_ImplDX12_Init(g_pd3dDevice, NUM_FRAMES_IN_FLIGHT, DXGI_FORMAT_R8G8B8A8_UNORM, g_pd3dSrvDescHeap,
 						g_pd3dSrvDescHeap->GetCPUDescriptorHandleForHeapStart(), g_pd3dSrvDescHeap->GetGPUDescriptorHandleForHeapStart());
+
+	HICON hIcon = (HICON)LoadImage(NULL, "../../Assets/TBG-Icon.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE);
+	SendMessage(hwnd, WM_SETICON, ICON_BIG, (LPARAM)hIcon);
+	SendMessage(hwnd, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
+
+	HKEY  hKey;
+	DWORD valueType;
+	BYTE  valueData[MAX_PATH];
+	DWORD valueSize = MAX_PATH;
+
+	// Open the registry key
+	if(RegOpenKeyEx(HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+		// Query the value of the specified value name
+		if(RegQueryValueEx(hKey, "TaskbarBeGone", nullptr, &valueType, valueData, &valueSize) == ERROR_SUCCESS) { runOnStartup = true; }
+
+		// close the key
+		RegCloseKey(hKey);
+	} else {
+		// handle error
+	}
+
+	// deserialize from a file
+	std::ifstream ifs("tbgData", std::ios::binary);
+	if(ifs.is_open()) {
+		boost::archive::text_iarchive ia(ifs);
+		size_t						  number_of_objects;
+		SelectedApps				  app;
+		ia >> number_of_objects;
+		// allocate number_of_objects objects
+		for(size_t i = 0; i != number_of_objects; ++i) {
+			ia >> app;
+			runningApplications.push_back(app);
+		}
+	}
 }
 
 TaskbarBeGone::~TaskbarBeGone() {
+	std::ofstream				  ofs("tbgData");
+	boost::archive::text_oarchive oa(ofs);
+	oa << std::count_if(runningApplications.begin(), runningApplications.end(), [](const SelectedApps& app) { return app.selected; });
+	for(SelectedApps& app : runningApplications) {
+		if(app.selected) { oa << app; }
+	}
+
 	WaitForLastSubmittedFrame();
 
 	// Cleanup
@@ -60,7 +105,6 @@ TaskbarBeGone::~TaskbarBeGone() {
 
 void TaskbarBeGone::MainWindow() {
 	ImGuiID dockspace = ImGui::DockSpaceOverViewport(0, ImGuiDockNodeFlags_NoTabBar);
-
 	// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
 	// if(show_demo_window) ImGui::ShowDemoWindow(&show_demo_window);
 
@@ -70,10 +114,25 @@ void TaskbarBeGone::MainWindow() {
 		if(ImGui::BeginMenuBar()) {
 			// Add a "File" menu
 			if(ImGui::BeginMenu("Settings")) {
-				ImGui::MenuItem("Minimize to Tray", NULL, &minimizeToTray);
+				ImGui::MenuItem("Minimize to tray", NULL, &minimizeToTray);
 				if(ImGui::MenuItem("Refresh application list")) {
-					runningApplications.clear();
-					EnumWindows(TaskbarBeGone::EnumWindowsProc, reinterpret_cast<LPARAM>(&runningApplications));
+					// remove applications with app.selected set to false
+					auto newEnd = std::remove_if(runningApplications.begin(), runningApplications.end(), [](const SelectedApps& app) { return !app.selected; });
+					// erase the removed elements from the vector
+					runningApplications.erase(newEnd, runningApplications.end());
+
+					EnumWindows(EnumWindowsProc, reinterpret_cast<LPARAM>(&runningApplications));
+
+					// sort runningApplications vector alphabetically by title
+					std::sort(runningApplications.begin(), runningApplications.end(),
+							  [](const SelectedApps& app1, const SelectedApps& app2) { return app1.title < app2.title; });
+				}
+				if(ImGui::MenuItem("Run on start-up", NULL, &runOnStartup)) {
+					if(runOnStartup) {
+						addToStartup();
+					} else {
+						removeFromStartup();
+					}
 				}
 				ImGui::EndMenu();
 			}
@@ -84,9 +143,11 @@ void TaskbarBeGone::MainWindow() {
 		// Get the HWND of the currently focused window
 		HWND foregroundWindow = GetForegroundWindow();
 
-		for(auto& app : runningApplications) {
+		for(SelectedApps& app : runningApplications) {
+			HWND appWindow = FindWindow(NULL, app.title.c_str());
+
 			// Check if the application's HWND matches the focused HWND
-			app.focused = (app.id == foregroundWindow);
+			app.focused	   = (appWindow == foregroundWindow);
 
 			ImGui::Selectable(app.title.c_str(), &app.selected);
 
@@ -106,8 +167,14 @@ void TaskbarBeGone::MainWindow() {
 }
 
 void TaskbarBeGone::Run() {
-	runningApplications.clear();
-	EnumWindows(TaskbarBeGone::EnumWindowsProc, reinterpret_cast<LPARAM>(&runningApplications));
+	auto newEnd = std::remove_if(runningApplications.begin(), runningApplications.end(), [](const SelectedApps& app) { return !app.selected; });
+	// erase the removed elements from the vector
+	runningApplications.erase(newEnd, runningApplications.end());
+	EnumWindows(EnumWindowsProc, reinterpret_cast<LPARAM>(&runningApplications));
+
+	// sort runningApplications vector alphabetically by title
+	std::sort(runningApplications.begin(), runningApplications.end(),
+			  [](const SelectedApps& app1, const SelectedApps& app2) { return app1.title < app2.title; });
 
 	// Main loop
 	while(!done) {
@@ -392,13 +459,19 @@ BOOL CALLBACK TaskbarBeGone::EnumWindowsProc(HWND hwnd, LPARAM lParam) {
 	char title[256];
 	GetWindowTextA(hwnd, title, sizeof(title));
 
-	// If the window is visible and has a title, add it to the list
+	// If the window is visible and has a title, and has not been added already, add it to the list
 	if(IsWindowVisible(hwnd) && strlen(title) > 0) {
-		auto&		 apps = *reinterpret_cast<std::vector<SelectedApps>*>(lParam);
-		SelectedApps app  = {title, hwnd, false};
-		apps.push_back(app);
-	}
+		auto& apps	 = *reinterpret_cast<std::vector<SelectedApps>*>(lParam);
+		auto  handle = reinterpret_cast<int>(hwnd);
 
+		auto  app	 = std::find_if(apps.begin(), apps.end(), [&title](const SelectedApps& app) { return app.title == title; });
+		if(app != apps.end()) { app->id = reinterpret_cast<int>(FindWindow(NULL, title)); }
+
+		if(std::find_if(apps.begin(), apps.end(), [&handle](const SelectedApps& app) { return app.id == handle; }) == apps.end()) {
+			SelectedApps app = {title, handle, false};
+			apps.push_back(app);
+		}
+	}
 	return TRUE;
 }
 
@@ -434,7 +507,7 @@ LRESULT WINAPI TaskbarBeGone::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 				nid.uID				 = 1;
 				nid.uFlags			 = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP | NIF_GUID;
 				nid.uCallbackMessage = WM_USER + 1;
-				nid.hIcon			 = LoadIcon(NULL, IDI_APPLICATION);
+				nid.hIcon			 = (HICON)LoadImage(NULL, "../../Assets/TBG-Icon.ico", IMAGE_ICON, 0, 0, LR_LOADFROMFILE);
 				strcpy_s(nid.szTip, "TaskbarBeGone");
 				Shell_NotifyIcon(NIM_ADD, &nid);
 				return 0;
@@ -453,4 +526,44 @@ LRESULT WINAPI TaskbarBeGone::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM
 		} break;
 	}
 	return ::DefWindowProcW(hWnd, msg, wParam, lParam);
+}
+
+void TaskbarBeGone::addToStartup() {
+	HKEY  hKey;
+	DWORD dwDisposition;
+
+	// Get the full path of the executable file
+	char  path[MAX_PATH];
+	GetModuleFileName(GetModuleHandle(nullptr), path, MAX_PATH);
+
+	// open the Run key
+	if(RegCreateKeyEx(HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", 0, NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &hKey,
+					  &dwDisposition) == ERROR_SUCCESS) {
+		// set the value of the entry to the path of your app's executable
+		if(RegSetValueEx(hKey, "TaskbarBeGone", 0, REG_SZ, (BYTE*)path, strlen(path) + 1) != ERROR_SUCCESS) {
+			// handle error
+		}
+
+		// close the key
+		RegCloseKey(hKey);
+	} else {
+		// handle error
+	}
+}
+
+void TaskbarBeGone::removeFromStartup() {
+	HKEY hKey;
+
+	// open the Run key
+	if(RegOpenKeyEx(HKEY_CURRENT_USER, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", 0, KEY_ALL_ACCESS, &hKey) == ERROR_SUCCESS) {
+		// delete the entry for your app
+		if(RegDeleteValue(hKey, "TaskbarBeGone") != ERROR_SUCCESS) {
+			// handle error
+		}
+
+		// close the key
+		RegCloseKey(hKey);
+	} else {
+		// handle error
+	}
 }
