@@ -4,6 +4,8 @@
 #include <iostream>
 #include <set>
 
+#include "json.hpp"
+
 TaskbarBeGone::TaskbarBeGone() : taskbar(FindWindow("Shell_TrayWnd", nullptr)) {
 	// Create application window
 	// ImGui_ImplWin32_EnableDpiAwareness();
@@ -41,7 +43,7 @@ TaskbarBeGone::TaskbarBeGone() : taskbar(FindWindow("Shell_TrayWnd", nullptr)) {
 		style.Colors[ImGuiCol_WindowBg].w = 1.0f;
 	}
 
-	io->Fonts->AddFontFromFileTTF("..\\..\\Assets\\Montserrat-Black.ttf", 14);
+	ImFont* font = io->Fonts->AddFontFromFileTTF("..\\..\\Assets\\Montserrat-Black.ttf", 14);
 
 	// Setup Platform/Renderer backends
 	ImGui_ImplWin32_Init(hwnd);
@@ -68,28 +70,34 @@ TaskbarBeGone::TaskbarBeGone() : taskbar(FindWindow("Shell_TrayWnd", nullptr)) {
 		// handle error
 	}
 
-	// deserialize from a file
-	std::ifstream ifs("tbgData", std::ios::binary);
-	if(ifs.is_open()) {
-		boost::archive::text_iarchive ia(ifs);
-		size_t						  number_of_objects;
-		SelectedApps				  app;
-		ia >> number_of_objects;
-		// allocate number_of_objects objects
-		for(size_t i = 0; i != number_of_objects; ++i) {
-			ia >> app;
+	// Load the application list from json
+	std::ifstream i("applications.json");
+	if(i.is_open()) {
+		nlohmann::json j;
+		i >> j;
+
+		for(auto& element : j) {
+			SelectedApps app = {element["title"], element["id"], element["selected"]};
 			runningApplications.push_back(app);
 		}
+	} else {
+		// handle error
 	}
 }
 
 TaskbarBeGone::~TaskbarBeGone() {
-	std::ofstream				  ofs("tbgData");
-	boost::archive::text_oarchive oa(ofs);
-	oa << std::count_if(runningApplications.begin(), runningApplications.end(), [](const SelectedApps& app) { return app.selected; });
+	ShowWindow(taskbar, SW_SHOW);
+
+	// Save the application list to json
+	nlohmann::json j;
 	for(SelectedApps& app : runningApplications) {
-		if(app.selected) { oa << app; }
+		if(app.selected) {
+			std::cout << app.title << " " << app.id << " " << app.selected << std::endl;
+			j.push_back({{"title", app.title}, {"id", app.id}, {"selected", app.selected}});
+		}
 	}
+	std::ofstream o("applications.json");
+	o << j.dump() << std::endl;
 
 	WaitForLastSubmittedFrame();
 
@@ -462,10 +470,10 @@ BOOL CALLBACK TaskbarBeGone::EnumWindowsProc(HWND hwnd, LPARAM lParam) {
 	// If the window is visible and has a title, and has not been added already, add it to the list
 	if(IsWindowVisible(hwnd) && strlen(title) > 0) {
 		auto& apps	 = *reinterpret_cast<std::vector<SelectedApps>*>(lParam);
-		auto  handle = reinterpret_cast<int>(hwnd);
+		auto  handle = reinterpret_cast<intptr_t>(hwnd);
 
 		auto  app	 = std::find_if(apps.begin(), apps.end(), [&title](const SelectedApps& app) { return app.title == title; });
-		if(app != apps.end()) { app->id = reinterpret_cast<int>(FindWindow(NULL, title)); }
+		if(app != apps.end()) { app->id = reinterpret_cast<intptr_t>(FindWindow(NULL, title)); }
 
 		if(std::find_if(apps.begin(), apps.end(), [&handle](const SelectedApps& app) { return app.id == handle; }) == apps.end()) {
 			SelectedApps app = {title, handle, false};

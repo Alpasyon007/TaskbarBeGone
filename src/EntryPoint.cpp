@@ -3,7 +3,7 @@
 
 #include "TaskbarBeGone.h"
 
-int main(int, char**) {
+int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow) {
 	TaskbarBeGone* app = new TaskbarBeGone();
 	app->Run();
 	delete app;

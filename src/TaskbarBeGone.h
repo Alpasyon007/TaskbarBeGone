@@ -14,9 +14,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/archive/text_iarchive.hpp>
-#include <boost/archive/text_oarchive.hpp>
-
 #ifdef _DEBUG
 	#define DX12_ENABLE_DEBUG_LAYER
 #endif
@@ -38,8 +35,6 @@ struct FrameContext {
 
 class SelectedApps {
 private:
-	friend class boost::serialization::access;
-
 	template <class Archive> void serialize(Archive& ar, const unsigned int version) {
 		ar& title;
 		ar& id;

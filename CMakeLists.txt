@@ -1,12 +1,9 @@
-# CMake Bulid File
-#
 # CMake Version
 cmake_minimum_required(VERSION 3.12)
 
 # Compiler Settings
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
-
 set(APP_ICON_RESOURCE_WINDOWS ${CMAKE_CURRENT_SOURCE_DIR}/Assets/icon.rc)
 
 # Set the project name
@@ -15,10 +12,11 @@ project(TaskbarBeGone)
 add_library(stb_image)
 
 add_subdirectory(ThirdParty/stb)
+add_subdirectory(ThirdParty/json)
 
 add_executable(
 	TaskbarBeGone
-	# WIN32
+	WIN32
 	${CMAKE_CURRENT_SOURCE_DIR}/src/EntryPoint.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/src/TaskbarBeGone.cpp
 
@@ -36,6 +34,10 @@ add_executable(
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui/backends/imgui_impl_win32.cpp
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui/backends/imgui_impl_dx12.cpp
 
+	# Json
+	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/json/include
+	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/json/include/nlohmann/json.hpp
+
 	${APP_ICON_RESOURCE_WINDOWS}
 )
 
@@ -46,6 +48,8 @@ target_include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui/backends
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/boost
+	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/json/include
+	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/json/include/nlohmann/
 )
 
 target_link_libraries(
@@ -54,5 +58,4 @@ target_link_libraries(
 	stb_image
 	d3d12
 	dxgi
-	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/boost/stage/lib/libboost_serialization-vc143-mt-gd-x64-1_82.lib
 )
