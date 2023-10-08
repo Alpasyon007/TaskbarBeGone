@@ -1,8 +1,0 @@
-!define VERSION "@APP_VERSION@"
-!define APP_VERSION "@APP_VERSION@"
-!define APP_NAME "@APP_NAME@"
-!define EXE_NAME "@EXE_NAME@"
-!define LICENSE_FILE "@CMAKE_CURRENT_SOURCE_DIR@LICENSE.txt"
-!define MUI_ICON "C:\\dev\\TaskbarBeGone\\Assets\\TBG-Icon.ico"
-!define MUI_UNICON "C:\\dev\\TaskbarBeGone\\Assets\\TBG-Icon.ico"
-!define PATCH  "0"

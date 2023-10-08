@@ -77,7 +77,7 @@ TaskbarBeGone::TaskbarBeGone() : taskbar(FindWindow("Shell_TrayWnd", nullptr)) {
 		i >> j;
 
 		for(auto& element : j) {
-			SelectedApps app = {element["title"], element["id"], element["selected"]};
+			SelectedApp app = {element["title"], element["id"], element["selected"]};
 			runningApplications.push_back(app);
 		}
 	} else {
@@ -90,7 +90,7 @@ TaskbarBeGone::~TaskbarBeGone() {
 
 	// Save the application list to json
 	nlohmann::json j;
-	for(SelectedApps& app : runningApplications) {
+	for(SelectedApp& app : runningApplications) {
 		if(app.selected) {
 			std::cout << app.title << " " << app.id << " " << app.selected << std::endl;
 			j.push_back({{"title", app.title}, {"id", app.id}, {"selected", app.selected}});
@@ -125,7 +125,7 @@ void TaskbarBeGone::MainWindow() {
 				ImGui::MenuItem("Minimize to tray", NULL, &minimizeToTray);
 				if(ImGui::MenuItem("Refresh application list")) {
 					// remove applications with app.selected set to false
-					auto newEnd = std::remove_if(runningApplications.begin(), runningApplications.end(), [](const SelectedApps& app) { return !app.selected; });
+					auto newEnd = std::remove_if(runningApplications.begin(), runningApplications.end(), [](const SelectedApp& app) { return !app.selected; });
 					// erase the removed elements from the vector
 					runningApplications.erase(newEnd, runningApplications.end());
 
@@ -133,7 +133,7 @@ void TaskbarBeGone::MainWindow() {
 
 					// sort runningApplications vector alphabetically by title
 					std::sort(runningApplications.begin(), runningApplications.end(),
-							  [](const SelectedApps& app1, const SelectedApps& app2) { return app1.title < app2.title; });
+							  [](const SelectedApp& app1, const SelectedApp& app2) { return app1.title < app2.title; });
 				}
 				if(ImGui::MenuItem("Run on start-up", NULL, &runOnStartup)) {
 					if(runOnStartup) {
@@ -151,7 +151,7 @@ void TaskbarBeGone::MainWindow() {
 		// Get the HWND of the currently focused window
 		HWND foregroundWindow = GetForegroundWindow();
 
-		for(SelectedApps& app : runningApplications) {
+		for(SelectedApp& app : runningApplications) {
 			HWND appWindow = FindWindow(NULL, app.title.c_str());
 
 			// Check if the application's HWND matches the focused HWND
@@ -175,14 +175,14 @@ void TaskbarBeGone::MainWindow() {
 }
 
 void TaskbarBeGone::Run() {
-	auto newEnd = std::remove_if(runningApplications.begin(), runningApplications.end(), [](const SelectedApps& app) { return !app.selected; });
+	auto newEnd = std::remove_if(runningApplications.begin(), runningApplications.end(), [](const SelectedApp& app) { return !app.selected; });
 	// erase the removed elements from the vector
 	runningApplications.erase(newEnd, runningApplications.end());
 	EnumWindows(EnumWindowsProc, reinterpret_cast<LPARAM>(&runningApplications));
 
 	// sort runningApplications vector alphabetically by title
 	std::sort(runningApplications.begin(), runningApplications.end(),
-			  [](const SelectedApps& app1, const SelectedApps& app2) { return app1.title < app2.title; });
+			  [](const SelectedApp& app1, const SelectedApp& app2) { return app1.title < app2.title; });
 
 	// Main loop
 	while(!done) {
@@ -469,14 +469,14 @@ BOOL CALLBACK TaskbarBeGone::EnumWindowsProc(HWND hwnd, LPARAM lParam) {
 
 	// If the window is visible and has a title, and has not been added already, add it to the list
 	if(IsWindowVisible(hwnd) && strlen(title) > 0) {
-		auto& apps	 = *reinterpret_cast<std::vector<SelectedApps>*>(lParam);
+		auto& apps	 = *reinterpret_cast<std::vector<SelectedApp>*>(lParam);
 		auto  handle = reinterpret_cast<intptr_t>(hwnd);
 
-		auto  app	 = std::find_if(apps.begin(), apps.end(), [&title](const SelectedApps& app) { return app.title == title; });
+		auto  app	 = std::find_if(apps.begin(), apps.end(), [&title](const SelectedApp& app) { return app.title == title; });
 		if(app != apps.end()) { app->id = reinterpret_cast<intptr_t>(FindWindow(NULL, title)); }
 
-		if(std::find_if(apps.begin(), apps.end(), [&handle](const SelectedApps& app) { return app.id == handle; }) == apps.end()) {
-			SelectedApps app = {title, handle, false};
+		if(std::find_if(apps.begin(), apps.end(), [&handle](const SelectedApp& app) { return app.id == handle; }) == apps.end()) {
+			SelectedApp app = {title, handle, false};
 			apps.push_back(app);
 		}
 	}

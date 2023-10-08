@@ -33,14 +33,8 @@ struct FrameContext {
 	UINT64					FenceValue;
 };
 
-class SelectedApps {
+struct SelectedApp {
 private:
-	template <class Archive> void serialize(Archive& ar, const unsigned int version) {
-		ar& title;
-		ar& id;
-		ar& selected;
-		ar& focused;
-	}
 public:
 	std::string title;
 	int			id;
@@ -102,7 +96,7 @@ private:
 	const ImVec4							  clear_color		  = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
 	HWND									  taskbar;
-	std::vector<SelectedApps>				  runningApplications;
+	std::vector<SelectedApp>				  runningApplications;
 };
 
 #endif /* TASKBAR_BE_GONE_H */

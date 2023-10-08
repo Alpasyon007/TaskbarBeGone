@@ -1,39 +1,77 @@
+;-------------------------------------------------------------------------------
+; Includes
 !include "MUI2.nsh"
+!include "LogicLib.nsh"
+!include "WinVer.nsh"
+!include "x64.nsh"
 
-!define MUI_STARTMENUPAGE_REGISTRY_ROOT "HKCU" ; Use HKEY_CURRENT_USER
-!define MUI_STARTMENUPAGE_REGISTRY_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\${CPACK_PACKAGE_INSTALL_REGISTRY_KEY}"
-!define MUI_STARTMENUPAGE_REGISTRY_VALUENAME "NoStartMenuShortcut"
+;-------------------------------------------------------------------------------
+; Constants
+!define PRODUCT_NAME "TaskbarBeGone"
+!define PRODUCT_DESCRIPTION "TaskbarBeGone"
+!define COPYRIGHT "Copyright © 2023 TaskbarBeGone"
+!define PRODUCT_VERSION "1.0.0.0"
+!define SETUP_VERSION 1.0.0.0
 
+;-------------------------------------------------------------------------------
+; Attributes
+Name "TaskbarBeGone"
+OutFile "TaskbarBeGoneSetup.exe"
+InstallDir "$PROGRAMFILES\TaskbarBeGone"
+InstallDirRegKey HKCU "Software\TaskbarBeGone" ""
+RequestExecutionLevel admin ; user|highest|admin
+
+;-------------------------------------------------------------------------------
+; Version Info
+VIProductVersion "${PRODUCT_VERSION}"
+VIAddVersionKey "ProductName" "${PRODUCT_NAME}"
+VIAddVersionKey "ProductVersion" "${PRODUCT_VERSION}"
+VIAddVersionKey "FileDescription" "${PRODUCT_DESCRIPTION}"
+VIAddVersionKey "LegalCopyright" "${COPYRIGHT}"
+VIAddVersionKey "FileVersion" "${SETUP_VERSION}"
+
+;-------------------------------------------------------------------------------
+; Modern UI Appearance
+!define MUI_ICON "${NSISDIR}\Contrib\Graphics\Icons\orange-install.ico"
+!define MUI_HEADERIMAGE
+!define MUI_HEADERIMAGE_BITMAP "${NSISDIR}\Contrib\Graphics\Header\orange.bmp"
+!define MUI_WELCOMEFINISHPAGE_BITMAP "${NSISDIR}\Contrib\Graphics\Wizard\orange.bmp"
+!define MUI_FINISHPAGE_NOAUTOCLOSE
+
+;-------------------------------------------------------------------------------
+; Installer Pages
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}\LICENSE.txt"
+;!insertmacro MUI_PAGE_LICENSE "${NSISDIR}\Docs\Modern UI\License.txt"
 !insertmacro MUI_PAGE_DIRECTORY
-!insertmacro MUI_PAGE_STARTMENU Application $START_MENU
 !insertmacro MUI_PAGE_INSTFILES
-
-!define MUI_FINISHPAGE_SHOWREADME "$INSTDIR\doc\html\index.html"
-!define MUI_FINISHPAGE_RUN "$INSTDIR\${CPACK_PACKAGE_NAME}.exe"
-
-!define MUI_FINISHPAGE_LINK "Create a Desktop Shortcut"
-!define MUI_FINISHPAGE_LINK_LOCATION "$DESKTOP\${CPACK_PACKAGE_NAME}.lnk"
-!define MUI_FINISHPAGE_COMMAND "$INSTDIR\${CPACK_PACKAGE_NAME}.exe"
 !insertmacro MUI_PAGE_FINISH
 
-!insertmacro MUI_LANGUAGE "English"
+;-------------------------------------------------------------------------------
+; Uninstaller Pages
+!insertmacro MUI_UNPAGE_WELCOME
 !insertmacro MUI_UNPAGE_CONFIRM
 !insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_UNPAGE_FINISH
 
-!insertmacro MUI_RESERVEFILE_LANGDLL
+;-------------------------------------------------------------------------------
+; Languages
 !insertmacro MUI_LANGUAGE "English"
 
-!define MUI_STARTMENU_WRITE_BEGIN
-  !insertmacro MUI_STARTMENU_GETFOLDER Application $START_MENU
-  CreateShortCut "$SMPROGRAMS\$START_MENU\${CPACK_PACKAGE_NAME}.lnk" "$INSTDIR\${CPACK_PACKAGE_NAME}.exe"
-!define MUI_STARTMENU_WRITE_END
+;-------------------------------------------------------------------------------
+; Installer Sections
+Section "TaskbarBeGone" TaskbarBeGone
+	SetOutPath "$INSTDIR\bin\x64"
+	File ".\build\Release\TaskbarBeGone.exe"
+	SetOutPath "$INSTDIR\Assets"
+	File /r ".\Assets\*"
+	WriteUninstaller "$INSTDIR\Uninstall.exe"
+SectionEnd
 
-!define MUI_STARTMENU_REMOVE_BEGIN
-  Delete "$SMPROGRAMS\$START_MENU\${CPACK_PACKAGE_NAME}.lnk"
-!define MUI_STARTMENU_REMOVE_END
-
-Function .onInit
-  !insertmacro MUI_LANGDLL_DISPLAY
-FunctionEnd
+;-------------------------------------------------------------------------------
+; Uninstaller Sections
+Section "Uninstall"
+	Delete "$INSTDIR\bin\x64\TaskbarBeGone.exe"
+	Delete "$INSTDIR\Uninstall.exe"
+	RMDir "$INSTDIR"
+	DeleteRegKey /ifempty HKCU "Software\TaskbarBeGone"
+SectionEnd

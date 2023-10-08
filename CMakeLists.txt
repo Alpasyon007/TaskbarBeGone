@@ -47,7 +47,6 @@ target_include_directories(
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/stb/
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/imgui/backends
-	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/boost
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/json/include
 	${CMAKE_CURRENT_SOURCE_DIR}/ThirdParty/json/include/nlohmann/
 )
